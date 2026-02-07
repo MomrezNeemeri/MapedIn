@@ -11,6 +11,30 @@ app.use(express.json());
 const RAPID_API_KEY = 'c4c14b3307mshb86b1f371e82ffcp1a4d29jsnf35efd4735e3'; 
 const CACHE_FILE = 'search_cache.json';
 
+// lat lng helper
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const getGeoForCity = async (city, state) => {
+    if (!city) return null;
+    try {
+        const query = `${city}, ${state || "Pennsylvania"}`;
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
+        
+        // Nominatim requires a User-Agent header
+        const res = await axios.get(url, { headers: { 'User-Agent': 'JobMapHackathon/1.0' } });
+        
+        if (res.data && res.data.length > 0) {
+            return { 
+                lat: parseFloat(res.data[0].lat), 
+                lng: parseFloat(res.data[0].lon) 
+            };
+        }
+    } catch (err) {
+        console.error(`Geocoding failed for ${city}:`, err.message);
+    }
+    return null;
+};
+
 
 const loadCache = () => {
     try {
@@ -63,30 +87,56 @@ app.get('/api/search', async (req, res) => {
     try {
         const response = await axios.request(options);
         const rawData = response.data.data;
+        let cleanJobs = [];
+
+        console.log(`>>> JSearch returned ${rawData.length} jobs. Processing geocodes...`);
+
+        for (let i = 0; i < rawData.length; i++) {
+            const job = rawData[i];
+            
+            // Only PA jobs
+            const jobState = (job.job_state || "").toLowerCase();
+            if (!jobState.includes("pa") && !jobState.includes("pennsylvania")) continue;
+
+            let finalLat = job.job_latitude;
+            let finalLng = job.job_longitude;
+
+            if (!finalLat || !finalLng) {
+                const jitter = (Math.random() - 0.5) * 0.02; 
+                
+                const geo = await getGeoForCity(job.job_city, job.job_state);
+                
+                if (geo) {
+                    finalLat = geo.lat + jitter;
+                    finalLng = geo.lng + jitter;
+                } else {
+                    finalLat = 40.8 + (Math.random() - 0.5);
+                    finalLng = -77.8 + (Math.random() - 0.5) * 3;
+                }
+                
+                await sleep(500); 
+            }
+
+            cleanJobs.push({
+                id: job.job_id || `${userQuery}-${i}`,
+                title: job.job_title,
+                company: job.employer_name,
+                city: job.job_city,
+                state: job.job_state,
+                lat: finalLat,
+                lng: finalLng,
+                type: job.job_employment_type,
+                apply_link: job.job_apply_link,
+                posted_at: job.job_posted_at_datetime_utc,
+                description: job.job_description ? job.job_description.substring(0, 200) + "..." : "No description"
+            });
+        }
 
         
-        const cleanJobs = rawData.map((job, i) => ({
-            id: job.job_id || `${userQuery}-${i}`,
-            title: job.job_title,
-            company: job.employer_name,
-            city: job.job_city,
-            state: job.job_state,
-            lat: job.job_latitude || 40.8 + (Math.random() - 0.5),
-            lng: job.job_longitude || -77.8 + (Math.random() - 0.5) * 3,
-            type: job.job_employment_type,
-            apply_link: job.job_apply_link,
-            posted_at: job.job_posted_at_datetime_utc,
-            description: job.job_description ? job.job_description.substring(0, 200) + "..." : "No description"
-        }))
-        .filter(job => job.state?.toLowerCase().includes("pa") || job.state?.toLowerCase().includes("pennsylvania"));
-
-        ;
-
-        // 4. SAVE TO CACHE & RETURN
         cache[fullQuery] = cleanJobs;
         saveCache(cache);
         
-        console.log(`>>> Success! Found ${cleanJobs.length} jobs.`);
+        console.log(`>>> Success! Returning ${cleanJobs.length} geocoded jobs.`);
         res.json(cleanJobs);
 
     } catch (error) {
@@ -95,5 +145,5 @@ app.get('/api/search', async (req, res) => {
     }
 });
 
-const PORT = 5000;
+const PORT = 5001;
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
