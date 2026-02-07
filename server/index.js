@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
@@ -7,21 +8,18 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- 1. CONFIG ---
-const RAPID_API_KEY = 'c4c14b3307mshb86b1f371e82ffcp1a4d29jsnf35efd4735e3'; 
+// CONFIG
+const RAPID_API_KEY = process.env.RAPID_API_KEY;
 const CACHE_FILE = 'search_cache.json';
 
-// --- 2. HELPERS ---
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Geocoding: Turns "Scranton, PA" into lat/lng
 const getGeoForCity = async (city, state) => {
     if (!city) return null;
     try {
         const query = `${city}, ${state || "Pennsylvania"}`;
         const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
         
-        // Nominatim requires a User-Agent header
         const res = await axios.get(url, { headers: { 'User-Agent': 'JobMapHackathon/1.0' } });
         
         if (res.data && res.data.length > 0) {
@@ -36,7 +34,6 @@ const getGeoForCity = async (city, state) => {
     return null;
 };
 
-// Caching: Loads/Saves to file so we don't burn API credits
 const loadCache = () => {
     try {
         if (fs.existsSync(CACHE_FILE)) {
@@ -50,35 +47,33 @@ const saveCache = (cache) => {
     fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2));
 };
 
-// --- 3. THE ROUTE ---
 app.get('/api/search', async (req, res) => {
-  const { q, date_posted, remote_jobs_only, employment_types } = req.query;
 
-  // Create a unique key for this specific search combination
-  const cacheKey = `${q}-${date_posted}-${remote_jobs_only}-${employment_types}`;
+  const { q, location, date_posted, remote_jobs_only, employment_types } = req.query;
+  const cacheKey = `${q}-${location}-${date_posted}-${remote_jobs_only}-${employment_types}`;
   const cache = loadCache();
 
   // A. CHECK CACHE FIRST
-  if (cache[cacheKey]) {
-      console.log("Serving from Cache:", cacheKey);
-      return res.json(cache[cacheKey]);
-  }
+//   if (cache[cacheKey]) {
+//       console.log("Serving from Cache:", cacheKey);
+//       return res.json(cache[cacheKey]);
+//   }
+  console.log("⚠️ skipping cache -> forcing fresh API call");
 
-  // B. PREPARE API CALL
-  const options = {
+  //  API CALL
+ const options = {
     method: 'GET',
     url: 'https://jsearch.p.rapidapi.com/search',
     params: {
-      query: q ? `${q} in Pennsylvania` : 'Software Engineer in Pennsylvania',
+      query: q ? `${q} in ${location || 'Pennsylvania'}` : `Software Engineer in ${location || 'Pennsylvania'}`,
       page: '1',
       num_pages: '1',
-      // Apply filters only if selected
       date_posted: date_posted !== 'all' ? date_posted : undefined,
       remote_jobs_only: remote_jobs_only === 'true' ? 'true' : undefined,
       employment_types: employment_types !== 'all' ? employment_types : undefined,
     },
     headers: {
-      'X-RapidAPI-Key': RAPID_API_KEY, // Use the constant defined at top
+      'X-RapidAPI-Key': RAPID_API_KEY,
       'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
     }
   };
@@ -88,26 +83,24 @@ app.get('/api/search', async (req, res) => {
     const response = await axios.request(options);
     const rawJobs = response.data.data;
 
-    // C. PROCESS & GEOCODE JOBS
-    // We can't just filter; we must fix missing coordinates
+    // PROCESS & GEOCODE JOBS
+
     const processedJobs = [];
 
     for (const job of rawJobs) {
         let lat = job.job_latitude;
         let lng = job.job_longitude;
 
-        // If coordinates are missing, fetch them!
         if (!lat || !lng) {
             console.log(`Geocoding ${job.job_city}...`);
             const coords = await getGeoForCity(job.job_city, job.job_state);
             if (coords) {
                 lat = coords.lat;
                 lng = coords.lng;
-                await sleep(1000); // Be nice to the free API
+                await sleep(1000); 
             }
         }
 
-        // Only add if we have valid coordinates now
         if (lat && lng) {
             processedJobs.push({
                 id: job.job_id,
@@ -125,7 +118,6 @@ app.get('/api/search', async (req, res) => {
         }
     }
 
-    // D. SAVE TO CACHE
     cache[cacheKey] = processedJobs;
     saveCache(cache);
 

@@ -5,13 +5,16 @@ import axios from 'axios'
 import './App.css'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet';
-import { colleges } from './colleges';
+import { colleges } from './colleges'; 
+import { US_STATES } from './states';
 
-
+// ICONS 
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 const DefaultIcon = L.icon({ iconUrl: icon, shadowUrl: iconShadow, iconSize: [25, 41], iconAnchor: [12, 41] });
 const BigIcon = L.icon({ iconUrl: icon, shadowUrl: iconShadow, iconSize: [38, 62], iconAnchor: [19, 62] });
+
+
 function MapEvents({ setBounds }) {
   useMapEvents({
     moveend: (e) => setBounds(e.target.getBounds()),
@@ -20,13 +23,26 @@ function MapEvents({ setBounds }) {
   return null;
 }
 
+function MapController({ targetState }) {
+  const map = useMapEvents({});
+  useEffect(() => {
+    if (targetState) {
+      map.flyTo([targetState.lat, targetState.lng], targetState.zoom, { duration: 2.0 });
+    }
+  }, [targetState]); 
+  return null;
+}
+
 // --- HOME PAGE ---
 function Home() {
   const [jobs, setJobs] = useState([]);
-  const [query, setQuery] = useState("Software Engineer");
+  const [query, setQuery] = useState(""); 
   const [loading, setLoading] = useState(false);
   const [bounds, setBounds] = useState(null);
   const [hoveredJobId, setHoveredJobId] = useState(null);
+
+  // Default : Pennsylvania
+  const [selectedState, setSelectedState] = useState(US_STATES[0]); 
 
   // Filters
   const [datePosted, setDatePosted] = useState("all");
@@ -34,11 +50,19 @@ function Home() {
   const [remoteOnly, setRemoteOnly] = useState(false);
 
   const fetchJobs = async () => {
+    if (!query.trim()) {
+        alert("Please enter a job title (e.g., 'Analyst')");
+        return;
+    }
+
     setLoading(true);
+    setJobs([]); // Clear old pins
+
     try {
       const res = await axios.get('http://localhost:5001/api/search', { 
         params: { 
           q: query,
+          location: selectedState.name, 
           date_posted: datePosted,
           employment_types: jobType,
           remote_jobs_only: remoteOnly
@@ -49,11 +73,9 @@ function Home() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchJobs(); }, []);
 
-  // --- THE ZOOM FILTER ---
   const visibleJobs = jobs.filter(job => {
-    if (!bounds) return true; // Show all if map isn't ready
+    if (!bounds) return true;
     return (
       job.lat <= bounds.getNorth() &&
       job.lat >= bounds.getSouth() &&
@@ -71,34 +93,55 @@ function Home() {
     <div className="app-container">
       <div className="sidebar">
         <div className="search-area">
-          <h2>Job Search PA</h2>
+          <h2 className='title'>MapedIn</h2>
           
-          <div style={{ display: 'flex', gap: '5px', marginBottom: '10px' }}>
+          {}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            
+            {}
             <input 
               type="text" 
               className="search-input"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && fetchJobs()}
+              placeholder="Job title..." 
+              style={{ flex: 2, minWidth: '0' }} 
             />
-            <button onClick={fetchJobs} style={{ background: '#003594', color: 'white', border: 'none', borderRadius: '4px', padding: '0 15px', cursor: 'pointer' }}>Go</button>
+
+            {/* State */}
+            <select 
+              value={selectedState.name}
+              onChange={(e) => {
+                const st = US_STATES.find(s => s.name === e.target.value);
+                setSelectedState(st);
+              }}
+              style={{ 
+                flex: 1, minWidth: '0', padding: '0 8px', borderRadius: '4px', 
+                border: '1px solid #ccc', background: 'white', fontWeight: 'bold', cursor: 'pointer'
+              }}
+            >
+              {US_STATES.map(s => (
+                <option key={s.code} value={s.name}>{s.code}</option> 
+              ))}
+            </select>
+
+            {}
+            <button onClick={fetchJobs} style={{ background: '#003594', color: 'white', border: 'none', borderRadius: '4px', padding: '0 20px', fontWeight: 'bold', cursor: 'pointer' }}>Go</button>
           </div>
 
-          {/* FILTERS */}
+          {}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
             <select value={datePosted} onChange={(e) => setDatePosted(e.target.value)} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.85rem', flex: 1 }}>
               <option value="all">Any Date</option>
               <option value="today">Today</option>
-              <option value="3days">Past 3 Days</option>
-              <option value="week">Past Week</option>
-              <option value="month">Past Month</option>
+              <option value="3days">3 Days</option>
+              <option value="week">Week</option>
             </select>
             <select value={jobType} onChange={(e) => setJobType(e.target.value)} style={{ padding: '6px', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.85rem', flex: 1 }}>
               <option value="all">Any Type</option>
               <option value="FULLTIME">Full Time</option>
-              <option value="CONTRACT">Contract</option>
-              <option value="PARTTIME">Part Time</option>
-              <option value="INTERN">Internship</option>
+              <option value="INTERN">Intern</option>
             </select>
             <label style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', background: remoteOnly ? '#e0e7ff' : '#f5f5f5', padding: '6px 10px', borderRadius: '4px', border: remoteOnly ? '1px solid #003594' : '1px solid #ccc' }}>
               <input type="checkbox" checked={remoteOnly} onChange={(e) => setRemoteOnly(e.target.checked)} style={{ cursor: 'pointer' }} />
@@ -108,12 +151,16 @@ function Home() {
         </div>
 
         <div className="results-list">
-          {loading && <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>Searching jobs...</div>}
+          {loading && <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>Searching in {selectedState.name}...</div>}
           
-          {!loading && visibleJobs.length === 0 && (
-             <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
-               No jobs in this view. <br/> Zoom out or pan map.
+          {!loading && jobs.length === 0 && (
+             <div style={{ padding: '40px 20px', textAlign: 'center', color: '#999' }}>
+               Search for jobs in <b>{selectedState.name}</b>!
              </div>
+          )}
+
+          {!loading && jobs.length > 0 && visibleJobs.length === 0 && (
+             <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>No jobs in this view. <br/> Zoom out or pan map.</div>
           )}
 
           {visibleJobs.map(job => (
@@ -127,78 +174,66 @@ function Home() {
               <h4 style={{ margin: '0 0 5px 0', color: '#003594' }}>{job.title}</h4>
               <div style={{ fontSize: '0.9rem' }}>{job.company}</div>
               <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
-                📍 {job.city || "PA"} 
-                {job.is_remote && <span style={{ marginLeft: '6px', background: '#e0f2f1', color: '#00695c', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem' }}>Remote</span>}
+                📍 {job.city || selectedState.name} 
               </div>
             </div>
           ))}
         </div>
       </div>
+      
       <div className="map-wrapper">
-        <MapContainer center={[40.9699, -77.7278]} zoom={8} zoomControl={false} style={{ height: '100%', width: '100%' }}>
+        <MapContainer center={[selectedState.lat, selectedState.lng]} zoom={selectedState.zoom} zoomControl={false} style={{ height: '100%', width: '100%' }}>
           <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" attribution='&copy; OpenStreetMap' />
           <ZoomControl position="bottomright" />
           
-          {/* PASS setBounds TO THE STABLE COMPONENT */}
           <MapEvents setBounds={setBounds} />
+          {/* THIS WILL NOW ONLY RUN WHEN selectedState CHANGES */}
+          <MapController targetState={selectedState} />
 
           {visibleJobs.map(job => (
             <Marker key={job.id} position={[job.lat, job.lng]} icon={hoveredJobId === job.id ? BigIcon : DefaultIcon}>
-              <Popup><b>{job.title}</b><br/>{job.company}</Popup>
+              <Popup>
+                <div style={{ textAlign: 'center', minWidth: '150px' }}>
+                  <b style={{ color: '#003594', fontSize: '1rem' }}>{job.title}</b>
+                  <div style={{ fontSize: '0.9rem', color: '#555' }}>{job.company}</div>
+                  <button onClick={() => handleJobClick(job)} style={{ background: '#003594', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '4px', marginTop: '8px', cursor: 'pointer', width: '100%' }}>
+                    View Details 🔗
+                  </button>
+                </div>
+              </Popup>
             </Marker>
           ))}
+          
         </MapContainer>
       </div>
     </div>
   );
 }
 
-//  PAGE 2
+// --- JOB DETAILS PAGE ---
 function JobDetails() {
-  const [job, setJob] = useState(null);
-  
-  
-  const [college, setCollege] = useState(() => {
+  const [job, setJob] = useState(() => {
     try {
-      const saved = localStorage.getItem('user_college');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.id && /^\d+$/.test(parsed.id)) return parsed;
-      }
-    } catch(e) {}
-    return { name: "University of Pittsburgh", id: "3461" }; // Default
+      const saved = localStorage.getItem('current_job');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) { return null; }
   });
-
-  const [alumniUrl, setAlumniUrl] = useState("");
-  const [input, setInput] = useState(college.name);
+  
+  const [college, setCollege] = useState(null); 
+  const [input, setInput] = useState("");
   const [suggestions, setSuggestions] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // LOAD 
-  useEffect(() => {
-    const jobData = localStorage.getItem('current_job');
-    if (jobData) setJob(JSON.parse(jobData));
-  }, []);
-
-  // link generation
-  useEffect(() => {
-    if (job) {
-      // Clean Company
+  // DERIVED STATE
+  let alumniUrl = "";
+  if (job && college) {
       let cleanCompany = job.company || "";
       cleanCompany = cleanCompany.replace(/,?\s?(Inc\.?|LLC|Corp\.?|Corporation|Ltd\.?|Co\.?)$/i, "").trim();
-
       let safeId = "3461"; 
-      if (college.id && /^\d+$/.test(college.id)) {
-        safeId = college.id;
-      }
-
-      // link generation
+      if (college.id && /^\d+$/.test(college.id)) safeId = college.id;
       const encodedCompany = encodeURIComponent(cleanCompany);
-      const url = `https://www.linkedin.com/search/results/people/?keywords=${encodedCompany}&origin=FACETED_SEARCH&schoolFilter=%5B%22${safeId}%22%5D`;
-      setAlumniUrl(url);
-    }
-  }, [job, college]);
-
+      alumniUrl = `https://www.linkedin.com/search/results/people/?keywords=${encodedCompany}&origin=FACETED_SEARCH&schoolFilter=%5B%22${safeId}%22%5D`;
+  }
 
   const handleInput = (e) => {
     const val = e.target.value;
@@ -214,29 +249,22 @@ function JobDetails() {
     setCollege(c);
     setInput(c.name);
     setShowDropdown(false);
-    localStorage.setItem('user_college', JSON.stringify(c));
-  };
-
-  // ---  RESET BUTTON ---
-  const handleReset = () => {
-    localStorage.removeItem('user_college');
-    setCollege({ name: "University of Pittsburgh", id: "3461" });
-    setInput("University of Pittsburgh");
-    alert("Data reset! Try the link again.");
   };
 
   if (!job) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>;
 
   return (
-    <div style={{ background: '#f4f6f8', minHeight: '100vh', padding: '20px' }}>
+    <div style={{ background: '#f4f6f8', height: '100vh', overflowY: 'auto', padding: '20px', boxSizing: 'border-box' }}>
       <div className="details-container">
-        
         <div className="details-header">
           <h1 style={{ color: '#003594', margin: '0 0 10px 0', fontSize: '2.2rem' }}>{job.title}</h1>
           <h3 style={{ color: '#555', margin: 0, fontWeight: 'normal' }}>
              {job.company}  •  <span style={{ color: '#888' }}>{job.city}</span>
           </h3>
         </div>
+            <a href={job.apply_link} target="_blank" style={{ display: 'inline-block', padding: '14px 28px', background: '#003594', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
+              Apply on Company Site ↗
+            </a>
 
         <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap' }}>
           
@@ -246,9 +274,6 @@ function JobDetails() {
               {job.description || "No description provided."}
             </p>
             <br/>
-            <a href={job.apply_link} target="_blank" style={{ display: 'inline-block', padding: '14px 28px', background: '#003594', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: 'bold' }}>
-              Apply on Company Site ↗
-            </a>
           </div>
 
           <div style={{ flex: 1, minWidth: '280px' }}>
@@ -261,7 +286,7 @@ function JobDetails() {
                   value={input}
                   onChange={handleInput}
                   onFocus={() => setShowDropdown(true)}
-                  placeholder="Type university..."
+                  placeholder="Select your university..."
                   style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ccc' }}
                 />
                 {showDropdown && suggestions.length > 0 && (
@@ -275,21 +300,20 @@ function JobDetails() {
                 )}
               </div>
 
-              <p style={{ fontSize: '0.9rem', color: '#333' }}>
-                Find <b>{college.name}</b> alumni at {job.company}:
-              </p>
-              
-              <a href={alumniUrl} target="_blank" style={{ display: 'block', textAlign: 'center', marginTop: '10px', padding: '12px', border: '2px solid #0077b5', color: '#0077b5', background: 'white', textDecoration: 'none', borderRadius: '6px', fontWeight: 'bold' }}>
-                View on LinkedIn
-              </a>
-
-              {/* RESET BUTTON */}
-              <button 
-                onClick={handleReset} 
-                style={{ marginTop: '20px', fontSize: '0.8rem', color: '#cc0000', border: 'none', background: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-              >
-                Fix / Reset Data
-              </button>
+              {college ? (
+                <>
+                    <p style={{ fontSize: '0.9rem', color: '#333' }}>
+                        Find <b>{college.name}</b> alumni at {job.company}:
+                    </p>
+                    <a href={alumniUrl} target="_blank" style={{ display: 'block', textAlign: 'center', marginTop: '10px', padding: '12px', border: '2px solid #0077b5', color: '#0077b5', background: 'white', textDecoration: 'none', borderRadius: '6px', fontWeight: 'bold' }}>
+                        View on LinkedIn
+                    </a>
+                </>
+              ) : (
+                <p style={{ fontSize: '0.9rem', color: '#777', fontStyle: 'italic' }}>
+                    Please select a university to see connections.
+                </p>
+              )}
 
             </div>
           </div>

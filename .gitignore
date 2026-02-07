@@ -5,3 +5,4 @@ server/node_modules/
 .DS_Store
 dist/
 server/search_cache.json
+.env
