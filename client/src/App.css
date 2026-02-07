@@ -1,72 +1,139 @@
+/* client/src/App.css */
 :root {
-  --primary: #003594;
-  --secondary: #FFB81C;
-  --bg-light: #f4f4f9;
-  --text-dark: #333;
+  --primary: #003594; /* Pitt Blue */
+  --gold: #FFB81C;    /* Pitt Gold */
+  --bg-light: #ffffff;
+  --bg-gray: #f4f6f8;
+  --text-main: #1a1a1a;
+  --text-muted: #666666;
 }
 
-
+/* 1. GLOBAL RESET - Forces Light Mode */
 body, html, #root {
   margin: 0;
   padding: 0;
   height: 100%;
   width: 100%;
-  overflow: hidden; 
+  background-color: var(--bg-light); /* Forces White Background */
+  color: var(--text-main);
   font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden; /* Prevents double scrollbars */
 }
 
-
+/* 2. MAIN LAYOUT (Split Screen) */
 .app-container {
   display: flex;
   height: 100vh;
   width: 100vw;
 }
 
-
+/* 3. SIDEBAR (Left Panel) */
 .sidebar {
-  width: 40%;
-  height: 100%;
+  width: 400px;
+  min-width: 350px;
   display: flex;
-  border-right: 2px solid #ddd;
+  flex-direction: column;
+  border-right: 1px solid #e0e0e0;
   background: white;
   z-index: 1000;
-  box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+  box-shadow: 4px 0 15px rgba(0,0,0,0.05);
 }
 
-
-.map-wrapper {
-  width: 60%;
-  height: 100%;
-  position: relative;
-  background: #e0e0e0; 
-}
-
-
+/* 4. SEARCH AREA (Sticky Top) */
 .search-area {
   padding: 20px;
   background: white;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #f0f0f0;
 }
 
+.search-input {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+  outline: none;
+  transition: border 0.2s;
+}
+
+.search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 53, 148, 0.1);
+}
+
+/* 5. RESULTS LIST */
 .results-list {
   flex: 1;
-  overflow-y: auto; 
-  padding: 10px;
-  background: var(--bg-light);
+  overflow-y: auto;
+  padding: 15px;
+  background: var(--bg-gray);
 }
 
+/* 6. JOB CARDS */
 .job-card {
   background: white;
-  padding: 15px;
-  margin-bottom: 10px;
+  padding: 18px;
+  margin-bottom: 12px;
   border-radius: 8px;
-  border: 1px solid #ddd;
+  border: 1px solid #e5e5e5;
   cursor: pointer;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .job-card:hover {
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   border-color: var(--primary);
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.job-card h4 {
+  margin: 0 0 6px 0;
+  color: var(--primary);
+  font-size: 1.1rem;
+}
+
+/* 7. MAP WRAPPER */
+.map-wrapper {
+  flex: 1;
+  height: 100%;
+  position: relative;
+}
+
+/* 8. JOB DETAILS PAGE (New Tab Styling) */
+.details-container {
+  max-width: 900px;
+  margin: 40px auto;
+  padding: 30px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 5px 20px rgba(0,0,0,0.05);
+  border: 1px solid #eee;
+}
+
+.details-header {
+  border-bottom: 1px solid #eee;
+  padding-bottom: 20px;
+  margin-bottom: 30px;
+}
+
+.alumni-box {
+  background: #f8faff;
+  border: 1px solid #e0e6f8;
+  padding: 25px;
+  border-radius: 10px;
+  height: fit-content;
+}
+
+/* --- MOBILE RESPONSIVENESS --- */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: column-reverse; /* Map Top, List Bottom */
+  }
+  .sidebar {
+    width: 100%;
+    height: 50%;
+  }
+  .map-wrapper {
+    height: 50%;
+  }
 }
