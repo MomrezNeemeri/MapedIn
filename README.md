@@ -13,7 +13,7 @@
 * **Alumni Network Integration:** A unique feature that automatically generates targeted LinkedIn search URLs, connecting users with alumni from their university who currently work at the target company.
 * **Geocoding Fallback:** Built-in integration with OpenStreetMap (Nominatim) to resolve coordinates for job listings that lack location data.
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 ### Frontend
 * **React (Vite):** High-performance component-based UI.
@@ -31,7 +31,7 @@
 
 ---
 
-## ⚙️ Installation & Setup
+##  Installation & Setup
 
 Follow these steps to run the project locally.
 
